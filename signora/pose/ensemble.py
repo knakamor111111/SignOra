@@ -28,7 +28,7 @@ class ReferenceEnsemble:
             backends = [
                 MediaPipeBackend(),
                 OpticalFlowBackend(),
-                DwposeOnnxBackend(),
+                DwposeOnnxBackend(models_dir="./models"),
             ]
         self.backends = [b for b in backends if b.available()]
         if not self.backends:
