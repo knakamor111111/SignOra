@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "signora"
+version = "0.6.0"
+description = "SignOra — Bittensor subnet for ASL video → English translation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "SignOra" }]
+dependencies = [
+    "bittensor>=8.0.0",
+    "bittensor-wallet>=3.0.0",
+    "numpy>=1.24",
+    "pydantic>=2.0",
+    "opencv-python-headless>=4.8",
+]
+
+[project.optional-dependencies]
+pose = [
+    "mediapipe>=0.10.14",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+signora-miner = "neurons.miner:main"
+signora-validator = "neurons.validator:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["signora*", "neurons*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
