@@ -14,19 +14,22 @@ from pathlib import Path
 import bittensor as bt
 
 from neurons.base import base_config, get_current_block_hash
-from signora.core.constants import MECH_POSE, MECH_TRANSLATION
+from signora.challenge.crypto import ScriptVault
+from signora.challenge.store import ChallengeStore
 from signora.core.types import PoseSubmission
-from signora.dbcp.protocol import DBCPSession, ValidatorCommit
+from signora.dbcp.protocol import DBCPSession
+from signora.pose.ensemble import ReferenceEnsemble
 from signora.pose.extractor import synthetic_pose_submission
 from signora.pose.gate import PoseQualityGate
 from signora.protocol.synapses import PoseChallengeSynapse, TranslationChallengeSynapse
 from signora.validation.comp_a import score_pose_submission
 from signora.validation.comp_b import score_translation
+from signora.validation.weight_committer import WeightCommitter
 from signora.validation.weights import build_mechanism_weights
 
 
 class Validator:
-    EPOCH_LENGTH = 12  # blocks; tune to subnet tempo
+    EPOCH_LENGTH = 12
 
     def __init__(self, config: bt.Config) -> None:
         self.config = config
@@ -35,9 +38,21 @@ class Validator:
         self.metagraph = self.subtensor.metagraph(config.netuid)
         self.dendrite = bt.dendrite(wallet=self.wallet)
         self.gate = PoseQualityGate()
+        self.reference_ensemble = ReferenceEnsemble()
         self.challenge_dir = Path("./data/challenges")
+        self.challenge_store = ChallengeStore(str(self.challenge_dir / "challenges.db"))
+        self.script_vault = ScriptVault()
         self.reference_dir = Path("./data/reference_poses")
         self.dbcp = DBCPSession(tempo=0, block_hash="")
+        self.weight_committer = WeightCommitter(
+            subtensor=self.subtensor,
+            wallet=self.wallet,
+            netuid=config.netuid,
+            use_timelock=getattr(config.signora, "weight_timelock", True),
+        )
+        bt.logging.info(
+            f"Reference ensemble backends: {self.reference_ensemble.pipeline_names}"
+        )
 
     def _load_challenge_clip(self, clip_path: Path) -> tuple[str, str, int]:
         clip_id = clip_path.stem
@@ -50,18 +65,35 @@ class Validator:
         video_b64 = base64.b64encode(clip_path.read_bytes()).decode("ascii")
         return clip_id, video_b64, stage
 
-    def _load_reference(self, clip_id: str, stage: int) -> PoseSubmission:
+    def _ground_truth(self, clip_id: str) -> str:
+        record = self.challenge_store.get(clip_id)
+        if record and record.revealed_script:
+            return record.revealed_script
+        if record:
+            try:
+                script = self.script_vault.decrypt(clip_id, record.ciphertext_b64)
+                if self.script_vault.verify_reveal(
+                    clip_id, script, record.script_commit, record.block_hash
+                ):
+                    return script
+            except Exception:
+                pass
+        return f"placeholder_gt_{clip_id}"
+
+    def _build_reference(self, clip_path: Path, clip_id: str, stage: int) -> PoseSubmission:
         ref_path = self.reference_dir / f"{clip_id}.json"
         if ref_path.exists():
             return PoseSubmission.from_dict(json.loads(ref_path.read_text()))
-        return synthetic_pose_submission(clip_id, stage)
+        try:
+            return self.reference_ensemble.extract_from_path(clip_path, clip_id, stage)
+        except Exception:
+            return synthetic_pose_submission(clip_id, stage)
 
     def _sample_miner_uids(self, k: int = 16) -> list[int]:
         n = self.metagraph.n
         if n == 0:
             return []
-        k = min(k, n)
-        return random.sample(list(range(n)), k)
+        return random.sample(list(range(n)), min(k, n))
 
     async def run_epoch(self, tempo: int) -> None:
         block_hash = get_current_block_hash(self.subtensor)
@@ -77,7 +109,7 @@ class Validator:
         pose_scores: dict[int, float] = {}
         translation_scores: dict[int, float] = {}
 
-        miner_uids = self._sample_miner_uids()
+        miner_uids = self._sample_miner_uids(self.config.signora.validator_sample_size)
         if not miner_uids:
             bt.logging.warning("No miners in metagraph.")
             return
@@ -85,8 +117,8 @@ class Validator:
         for clip_path in clips[:5]:
             clip_id, video_b64, stage = self._load_challenge_clip(clip_path)
             clip_ids.append(clip_id)
-            reference = self._load_reference(clip_id, stage)
-            references[clip_id] = f"placeholder_gt_{clip_id}"
+            reference = self._build_reference(clip_path, clip_id, stage)
+            references[clip_id] = self._ground_truth(clip_id)
 
             pose_synapse = PoseChallengeSynapse(
                 clip_id=clip_id,
@@ -140,9 +172,7 @@ class Validator:
 
         uids = list(set(pose_scores) | set(translation_scores))
         mech_weights = build_mechanism_weights(uids, pose_scores, translation_scores)
-
-        await self._set_weights(mech_weights.get(MECH_POSE, []), MECH_POSE)
-        await self._set_weights(mech_weights.get(MECH_TRANSLATION, []), MECH_TRANSLATION)
+        self.weight_committer.submit_all(mech_weights)
 
         reveal = {
             "clip_ids": vc.clip_ids,
@@ -153,27 +183,6 @@ class Validator:
         }
         ok = self.dbcp.verify_reveal("validator", reveal, v_commit)
         bt.logging.info(f"DBCP validator reveal verified={ok}")
-
-    async def _set_weights(
-        self, weights: list[tuple[int, float]], mech_id: int
-    ) -> None:
-        if not weights:
-            return
-        uids = [u for u, _ in weights]
-        vals = [w for _, w in weights]
-        bt.logging.info(f"Setting mech={mech_id} weights for {len(uids)} miners")
-        try:
-            self.subtensor.set_weights(
-                wallet=self.wallet,
-                netuid=self.config.netuid,
-                uids=uids,
-                weights=vals,
-                mechid=mech_id,
-                wait_for_inclusion=False,
-                wait_for_finalization=False,
-            )
-        except Exception:
-            bt.logging.error(traceback.format_exc())
 
     def run(self) -> None:
         bt.logging.info("SignOra validator running.")

@@ -15,7 +15,7 @@ from signora.pose.extractor import (
     synthetic_pose_submission,
 )
 from signora.protocol.synapses import PoseChallengeSynapse, TranslationChallengeSynapse
-from signora.translation.baseline import BaselineTranslator
+from signora.translation.sequence_model import PoseSequenceTranslator
 
 
 class Miner:
@@ -31,7 +31,7 @@ class Miner:
         except (RuntimeError, FileNotFoundError) as exc:
             bt.logging.warning(f"PoseExtractor unavailable: {exc}. Using synthetic fallback.")
 
-        self.translator = BaselineTranslator(model_dir=config.signora.model_dir)
+        self.translator = PoseSequenceTranslator(model_dir=config.signora.model_dir)
 
         self.axon = bt.axon(wallet=self.wallet, config=config)
         self.axon.attach(forward_fn=self.forward_pose, blacklist_fn=self.blacklist)

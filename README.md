@@ -1,18 +1,30 @@
 # SignOra
 
-Bittensor subnet for **ASL video → English translation** via a two-competition mining pipeline:
+Bittensor subnet for **ASL video → English translation** via a two-competition mining pipeline.
+
+Repository: [github.com/knakamor111111/SignOra](https://github.com/knakamor111111/SignOra)
 
 1. **Competition A** — skeletal pose extraction (proof-of-compute JSON)
 2. **Competition B** — sequence-to-meaning translation from gate-passed pose data
 
-Mechanism spec v0.6: see [docs/MECHANISM.md](./docs/MECHANISM.md). Chain mapping lives in the [subtensor signora spec](https://github.com/opentensor/subtensor) (`signora/docs/`).
+## v0.7 highlights
+
+See [docs/V07.md](./docs/V07.md) for full details.
+
+| Feature | Command / module |
+|---------|------------------|
+| Reference pose ensemble | `signora/pose/ensemble.py` |
+| Commit-reveal weights | `signora/validation/weight_committer.py` |
+| Challenge server | `python scripts/run_challenge_server.py` |
+| Train Comp B model | `python scripts/train_translator.py` |
+
 
 ## Quick start
 
 ```bash
 cd signora
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[pose,dev]"
+pip install -e ".[pose,server,dev]"
 
 # Miner (Comp A + Comp B)
 python neurons/miner.py \
@@ -59,7 +71,7 @@ signora/
 | 1 | Competition B — translation |
 | 2 | Corpus mining (Phase 1b+) |
 
-Validators submit weights per mechanism via `set_mechanism_weights` / commit-reveal.
+Validators submit weights via commit-reveal / CRv3 timelock (`WeightCommitter`), with direct fallback.
 
 ## Pose quality gate
 

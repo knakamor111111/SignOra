@@ -1,0 +1,12 @@
+[
+  {
+    "pose": {
+      "clip_id": "demo_s1_hello",
+      "stage": 1,
+      "pipeline": "synthetic",
+      "miner_confidence": 0.85,
+      "frames": []
+    },
+    "text": "hello"
+  }
+]

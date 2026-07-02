@@ -25,6 +25,18 @@ def add_signora_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         default="./models",
         help="Directory for translation / lookup models",
     )
+    parser.add_argument(
+        "--signora.validator_sample_size",
+        type=int,
+        default=16,
+        help="Miners sampled per epoch",
+    )
+    parser.add_argument(
+        "--signora.weight_timelock",
+        action="store_true",
+        default=True,
+        help="Use CRv3 timelocked commits when subnet enables commit-reveal",
+    )
     return parser
 
 
