@@ -11,7 +11,7 @@ Bittensor subnet for **ASL video → English translation** via a two-competition
 
 SignOra applies the Score SN44 pattern: miners submit structured data that proves they ran real computation, not translation guesses. Known-plaintext capture, DBCP commit-reveal, and a multi-signal pose gate protect against gaming and chicken-and-egg bootstrap problems.
 
-Mechanism spec: [docs/MECHANISM.md](./docs/MECHANISM.md) · v0.7 details: [docs/V07.md](./docs/V07.md)
+Mechanism spec: [docs/MECHANISM_PAPER_V05.md](./docs/MECHANISM_PAPER_V05.md) (full v0.5 paper) · [docs/MECHANISM.md](./docs/MECHANISM.md) (v0.6 quick reference) · v0.7 implementation: [docs/V07.md](./docs/V07.md) · **ASL vs pose backends:** [docs/ASL_AND_POSE.md](./docs/ASL_AND_POSE.md)
 
 ---
 

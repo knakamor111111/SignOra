@@ -75,3 +75,32 @@ def is_direct_video_url(url: str) -> bool:
     if "youtube.com" in lower or "youtu.be" in lower:
         return False
     return lower.endswith((".mp4", ".mov", ".webm", ".mkv")) or "mp4" in lower
+
+
+def fetch_wlasl_metadata(cache_path: Path) -> list[dict[str, Any]]:
+    """Download or load WLASL_v0.3.json."""
+    return fetch_wlasl_json(cache_path)
+
+
+def build_wlasl_training_pairs(
+    metadata_path: Path,
+    max_samples: int = 100,
+    subset: str = "WLASL100",
+) -> list[dict[str, Any]]:
+    """
+    Metadata-only ASL training pairs (synthetic pose until video is downloaded).
+
+    Each row: {"pose": PoseSubmission dict, "text": English gloss translation}.
+    """
+    from signora.pose.extractor import synthetic_pose_submission
+
+    data = fetch_wlasl_json(metadata_path)
+    instances = iter_instances(data, subset=subset, split="train")
+    pairs: list[dict[str, Any]] = []
+
+    for inst in instances[:max_samples]:
+        clip_id = f"wlasl_{inst['video_id']}"
+        pose = synthetic_pose_submission(clip_id, stage=2, num_frames=24)
+        pairs.append({"pose": pose.to_dict(), "text": inst["text"]})
+
+    return pairs

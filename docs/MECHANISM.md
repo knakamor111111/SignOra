@@ -1,6 +1,6 @@
 # SignOra Mechanism v0.6
 
-See the full specification in the [subtensor signora docs](https://github.com/opentensor/subtensor/tree/main/signora).
+Implementation-focused summary. For the full original specification, see **[MECHANISM_PAPER_V05.md](./MECHANISM_PAPER_V05.md)** (converted from the June 2026 PDF).
 
 ## Quick reference
 
